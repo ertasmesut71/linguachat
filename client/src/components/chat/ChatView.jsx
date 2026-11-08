@@ -201,7 +201,7 @@ export default function ChatView({ onBack }) {
   } : {};
 
   return (
-    <div style={{ display: "flex", height: "100vh", minWidth: 0, flex: 1, ...themeStyle }}>
+    <div style={{ display: "flex", height: "100%", minWidth: 0, flex: 1, ...themeStyle }}>
       <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <div style={{ padding: "12px 16px", paddingTop: "max(12px, calc(12px + env(safe-area-inset-top)))", borderBottom: "1px solid var(--border)", background: "var(--bg-secondary)", display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
           <button className="icon-btn chat-back-btn chat-touch-target" onClick={onBack} aria-label="Back"><ArrowLeft size={18} /></button>
