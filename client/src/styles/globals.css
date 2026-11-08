@@ -2,6 +2,14 @@
    LinguaChat — Design System
    ═══════════════════════════════════════════ */
 
+/* ─── iOS/Android Safe Area ─── */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
 :root {
   /* ─── Palette ─── */
   --bg-primary: #0a0a0f;
@@ -101,6 +109,8 @@ body {
   min-width: 320px;
   /* D6 — prevent unintended horizontal overflow on any device */
   overflow-x: hidden;
+  padding-top: var(--safe-top);
+  padding-bottom: var(--safe-bottom);
 }
 
 a {
