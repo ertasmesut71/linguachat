@@ -109,8 +109,6 @@ body {
   min-width: 320px;
   /* D6 — prevent unintended horizontal overflow on any device */
   overflow-x: hidden;
-  padding-top: var(--safe-top);
-  padding-bottom: var(--safe-bottom);
 }
 
 a {
