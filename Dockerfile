@@ -7,6 +7,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json ./
 COPY client/package.json ./client/
+COPY server/db/prisma/schema.prisma ./server/db/prisma/
 RUN npm install --production=false
 RUN cd client && npm install
 
