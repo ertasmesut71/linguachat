@@ -94,6 +94,16 @@ app.use("/api/contacts", apiLimiter, contactsRoutes);
 app.use("/api/admin", apiLimiter, adminRoutes);
 app.use("/api/ai", aiLimiter, aiRoutes);
 
+// ─── Serve React SPA (production only) ───
+if (config.env === "production") {
+  const path = require("path");
+  const clientDist = path.join(__dirname, "../client/dist");
+  app.use(express.static(clientDist, { maxAge: "7d", immutable: true }));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+}
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
