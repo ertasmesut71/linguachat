@@ -296,12 +296,13 @@ a:hover {
 /* ─── Auth Layout ─── */
 .auth-page {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   min-height: 100vh;
   padding: var(--space-xl);
   position: relative;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .auth-orb {
