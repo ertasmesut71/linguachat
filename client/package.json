@@ -1,0 +1,32 @@
+{
+  "name": "linguachat-client",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "vite build",
+    "preview": "vite preview",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:build": "npm run build && npx cap sync android",
+    "android:run": "npm run build && npx cap run android"
+  },
+  "dependencies": {
+    "@capacitor-community/contacts": "^6.1.1",
+    "@capacitor/core": "^6.2.0",
+    "libphonenumber-js": "^1.13.14",
+    "lucide-react": "^0.441.0",
+    "qrcode.react": "^4.1.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.0",
+    "@types/react": "^18.3.5",
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.3"
+  }
+}

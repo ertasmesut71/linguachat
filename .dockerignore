@@ -1,0 +1,14 @@
+node_modules
+client/node_modules
+client/dist
+server/data
+.env
+.env.bak
+.env.example.bak
+*.log
+.git
+.gitignore
+.DS_Store
+README.md
+docker-compose.yml
+ecosystem.config.js

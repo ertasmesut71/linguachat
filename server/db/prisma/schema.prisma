@@ -1,0 +1,394 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───
+
+enum UserRole {
+  user
+  admin
+  moderator
+}
+
+enum UserStatus {
+  online
+  away
+  offline
+  do_not_disturb
+}
+
+enum ChatType {
+  direct
+  group
+}
+
+enum MessageType {
+  text
+  voice
+  image
+  video
+  file
+  system
+}
+
+enum MessageStatus {
+  sending
+  sent
+  delivered
+  seen
+}
+
+enum MemberRole {
+  owner
+  admin
+  member
+}
+
+// ─── Models ───
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  email        String?    @unique @db.VarChar(255)
+  phoneNumber  String?    @unique @map("phone_number") @db.VarChar(20)
+  passwordHash String?    @map("password_hash") @db.VarChar(255)
+  displayName  String     @map("display_name") @db.VarChar(100)
+  avatarUrl    String?    @map("avatar_url") @db.VarChar(500)
+  bio          String     @default("") @db.VarChar(500)
+  role         UserRole   @default(user)
+  status       UserStatus @default(offline)
+  primaryLang  String     @default("en") @map("primary_lang") @db.VarChar(10)
+  lastSeenAt   DateTime   @default(now()) @map("last_seen_at") @db.Timestamptz()
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz()
+
+  chatMembers     ChatMember[]
+  sentMessages    Message[]        @relation("SentMessages")
+  createdChats    Chat[]           @relation("CreatedChats")
+  receipts        MessageReceipt[]
+  refreshTokens   RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  approvedPairings    PairingToken[]       @relation("ApprovedPairings")
+  pushSubscriptions   PushSubscription[]
+  blocksMade          BlockedUser[]        @relation("BlocksMade")
+  blocksReceived      BlockedUser[]        @relation("BlocksReceived")
+  reportsMade         Report[]             @relation("ReportsMade")
+  reportsReceived     Report[]             @relation("ReportsReceived")
+  hiddenMessages      HiddenMessage[]
+  starredMessages     StarredMessage[]
+  pinnedMessages      PinnedMessage[]
+  chatLists           ChatList[]
+
+  @@index([email])
+  @@index([status])
+  @@map("users")
+}
+
+model Chat {
+  id                 String   @id @default(uuid()) @db.Uuid
+  type               ChatType @default(direct)
+  name               String?  @db.VarChar(200)
+  description        String?  @db.VarChar(500)
+  avatarUrl          String?  @map("avatar_url") @db.VarChar(500)
+  createdBy          String?  @map("created_by") @db.Uuid
+  // Pack E: disappearing messages timer in seconds (null=off, 86400=24h, 604800=7d, 2592000=30d, 7776000=90d)
+  disappearingTimer  Int?     @map("disappearing_timer")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  creator        User?           @relation("CreatedChats", fields: [createdBy], references: [id])
+  members        ChatMember[]
+  messages       Message[]
+  pinnedMessages PinnedMessage[]
+
+  @@index([type])
+  @@map("chats")
+}
+
+model ChatMember {
+  id            String     @id @default(uuid()) @db.Uuid
+  chatId        String     @map("chat_id") @db.Uuid
+  userId        String     @map("user_id") @db.Uuid
+  role          MemberRole @default(member)
+  receiveLang   String?    @map("receive_lang") @db.VarChar(10)
+  autoTranslate Boolean    @default(true) @map("auto_translate")
+  muted         Boolean    @default(false)
+  lastReadAt    DateTime   @default(now()) @map("last_read_at") @db.Timestamptz()
+  joinedAt      DateTime   @default(now()) @map("joined_at") @db.Timestamptz()
+  hiddenAt      DateTime?  @map("hidden_at") @db.Timestamptz()
+  clearedAt     DateTime?  @map("cleared_at") @db.Timestamptz()
+  // Pack A: per-user archive
+  archivedAt    DateTime?  @map("archived_at") @db.Timestamptz()
+  // Pack B: per-user favorite
+  favoritedAt   DateTime?  @map("favorited_at") @db.Timestamptz()
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([chatId])
+  @@index([userId])
+  @@map("chat_members")
+}
+
+model Message {
+  id        String      @id @default(uuid()) @db.Uuid
+  chatId    String      @map("chat_id") @db.Uuid
+  senderId  String      @map("sender_id") @db.Uuid
+  type      MessageType @default(text)
+  content   String      @default("") @db.Text
+  metadata  Json        @default("{}")
+  replyToId String?     @map("reply_to_id") @db.Uuid
+  editedAt  DateTime?   @map("edited_at") @db.Timestamptz()
+  deletedAt DateTime?   @map("deleted_at") @db.Timestamptz()
+  // Pack E: disappearing messages — set at send time from chat.disappearingTimer
+  expiresAt DateTime?   @map("expires_at") @db.Timestamptz()
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz()
+
+  // E8 — Postgres tsvector for full-text search. Managed by a DB trigger,
+  // not by Prisma. Prisma marks it Unsupported so it won't try to read/write it.
+  searchVector Unsupported("tsvector")? @map("search_vector")
+
+  chat         Chat              @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender       User              @relation("SentMessages", fields: [senderId], references: [id])
+  replyTo      Message?          @relation("MessageReplies", fields: [replyToId], references: [id])
+  replies      Message[]         @relation("MessageReplies")
+  receipts     MessageReceipt[]
+  translations Translation[]
+  hiddenBy     HiddenMessage[]
+  starredBy    StarredMessage[]
+  pinnedIn     PinnedMessage[]
+
+  @@index([chatId, createdAt(sort: Desc)])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model MessageReceipt {
+  id        String        @id @default(uuid()) @db.Uuid
+  messageId String        @map("message_id") @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  status    MessageStatus @default(sent)
+  updatedAt DateTime      @updatedAt @map("updated_at") @db.Timestamptz()
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@map("message_receipts")
+}
+
+model Translation {
+  id             String   @id @default(uuid()) @db.Uuid
+  messageId      String   @map("message_id") @db.Uuid
+  sourceLang     String   @map("source_lang") @db.VarChar(10)
+  targetLang     String   @map("target_lang") @db.VarChar(10)
+  translatedText String   @map("translated_text") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, targetLang])
+  @@index([messageId])
+  @@map("translations")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz()
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz()
+  consumedAt DateTime? @map("consumed_at") @db.Timestamptz()
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+enum PairingStatus {
+  pending
+  approved
+  consumed
+  expired
+}
+
+model PairingToken {
+  id              String        @id @default(uuid()) @db.Uuid
+  code            String        @unique @db.VarChar(16)
+  nonceHash       String        @map("nonce_hash") @db.VarChar(255)
+  deviceLabel     String?       @map("device_label") @db.VarChar(120)
+  status          PairingStatus @default(pending)
+  approvedUserId  String?       @map("approved_user_id") @db.Uuid
+  expiresAt       DateTime      @map("expires_at") @db.Timestamptz()
+  consumedAt      DateTime?     @map("consumed_at") @db.Timestamptz()
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz()
+
+  approvedUser User? @relation("ApprovedPairings", fields: [approvedUserId], references: [id], onDelete: SetNull)
+
+  @@index([code])
+  @@index([status])
+  @@map("pairing_tokens")
+}
+
+model PushSubscription {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  endpoint    String   @unique @db.Text
+  p256dh      String   @db.VarChar(255)
+  auth        String   @db.VarChar(255)
+  userAgent   String?  @map("user_agent") @db.VarChar(500)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at") @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([endpoint])
+  @@map("push_subscriptions")
+}
+
+model BlockedUser {
+  id        String   @id @default(uuid()) @db.Uuid
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  blocker User @relation("BlocksMade", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlocksReceived", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+  @@map("blocked_users")
+}
+
+model Report {
+  id         String   @id @default(uuid()) @db.Uuid
+  reporterId String   @map("reporter_id") @db.Uuid
+  reportedId String   @map("reported_id") @db.Uuid
+  reason     String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  reporter User @relation("ReportsMade", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User @relation("ReportsReceived", fields: [reportedId], references: [id], onDelete: Cascade)
+
+  @@index([reporterId])
+  @@index([reportedId])
+  @@map("reports")
+}
+
+// Per-user "Delete for me": a row hides one message from ONE user's view only.
+// The message itself (and every other participant's copy) is untouched.
+model HiddenMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@map("hidden_messages")
+}
+
+// Per-user starred messages. Star state is per-user — not global.
+model StarredMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@index([messageId])
+  @@map("starred_messages")
+}
+
+// Chat-level pinned messages. Pinning is shared for all chat members.
+model PinnedMessage {
+  id        String   @id @default(uuid()) @db.Uuid
+  chatId    String   @map("chat_id") @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  pinnedBy  String   @map("pinned_by") @db.Uuid
+  pinnedAt  DateTime @default(now()) @map("pinned_at") @db.Timestamptz()
+
+  chat    Chat    @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  pinner  User    @relation(fields: [pinnedBy], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, messageId])
+  @@index([chatId])
+  @@map("pinned_messages")
+}
+
+// Pack C: Custom Lists — per-user named collections of chats
+model ChatList {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String   @db.VarChar(100)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz()
+
+  user  User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items ChatListMember[]
+
+  @@index([userId])
+  @@map("chat_lists")
+}
+
+// Pack C: Junction table between ChatList and Chat
+model ChatListMember {
+  id        String   @id @default(uuid()) @db.Uuid
+  listId    String   @map("list_id") @db.Uuid
+  chatId    String   @map("chat_id") @db.Uuid
+  addedAt   DateTime @default(now()) @map("added_at") @db.Timestamptz()
+
+  list ChatList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  @@unique([listId, chatId])
+  @@index([listId])
+  @@map("chat_list_members")
+}
+
+model OtpCode {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  phone       String   @db.VarChar(20)
+  code        String   @db.VarChar(10)
+  purpose     String   @default("verify") @db.VarChar(20)
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5) @map("max_attempts")
+  consumed    Boolean  @default(false)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([phone, purpose, consumed], name: "idx_otp_codes_phone")
+  @@index([expiresAt], name: "idx_otp_codes_expires")
+  @@map("otp_codes")
+}
