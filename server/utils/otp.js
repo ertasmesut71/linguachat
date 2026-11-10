@@ -1,53 +1,85 @@
 /**
- * OTP Service — phone verification via SMS codes.
- *
- * Flow:
- *   1. Client calls POST /api/auth/otp/request with { phone, purpose }
- *   2. Server generates a 6-digit code, stores it, sends SMS
- *   3. Client calls POST /api/auth/otp/verify with { phone, code, purpose }
- *   4. Server validates code → returns { verified: true }
- *
- * Purposes:
- *   - "verify"   Phone ownership verification (e.g. after registration)
- *   - "login"    Passwordless login via OTP (if the phone is already registered)
- *
- * Security:
- *   - 6-digit numeric codes (1M possibilities)
- *   - 5-minute expiry
- *   - Max 5 wrong attempts per code
- *   - Max 5 OTP requests per phone per 10 minutes (rate limiting)
- *   - Codes are invalidated after successful verification
- *   - Previous unused codes for the same phone+purpose are auto-invalidated
+ * OTP Service — phone verification via Twilio Verify API.
  */
 
-const crypto = require("crypto");
-const store = require("../db/store");
 const { normalizePhone } = require("./phone");
-const { sendSms, getProvider } = require("./sms");
 const ApiError = require("./ApiError");
+const store = require("../db/store");
 
-const OTP_LENGTH = 6;
-const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
-const MAX_REQUESTS_PER_WINDOW = 5;
-const RATE_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const USE_TWILIO_VERIFY = !!(
+  process.env.TWILIO_ACCOUNT_SID &&
+  process.env.TWILIO_AUTH_TOKEN &&
+  process.env.TWILIO_VERIFY_SID
+);
 
-/**
- * Generate a cryptographically random numeric OTP.
- */
-function generateOtp() {
-  // Generate 6 random digits using crypto
-  const bytes = crypto.randomBytes(4);
-  const num = bytes.readUInt32BE(0) % Math.pow(10, OTP_LENGTH);
-  return String(num).padStart(OTP_LENGTH, "0");
+async function _twilioRequest(path, params) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken  = process.env.TWILIO_AUTH_TOKEN;
+  const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+  const url  = `https://verify.twilio.com/v2${path}`;
+  const res = await fetch(url, {
+    method:  "POST",
+    headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
+    body:    new URLSearchParams(params).toString(),
+  });
+  return { status: res.status, body: await res.json() };
 }
 
-/**
- * Request an OTP for a phone number.
- *
- * @param {string} rawPhone  User-entered phone number
- * @param {string} purpose   "verify" | "login"
- * @returns {{ sent: boolean, phone: string, expiresAt: string, dev?: { code: string } }}
- */
+async function _sendViaTwilioVerify(phone) {
+  const verifySid = process.env.TWILIO_VERIFY_SID;
+  const { status, body } = await _twilioRequest(
+    `/Services/${verifySid}/Verifications`,
+    { To: `+${phone}`, Channel: "sms" }
+  );
+  if (status !== 201) {
+    console.error("[otp:twilio] send failed:", body.message || body.code);
+    throw ApiError.internal("Could not send verification code. Please try again.");
+  }
+  return { sent: true, provider: "twilio-verify" };
+}
+
+async function _checkViaTwilioVerify(phone, code) {
+  const verifySid = process.env.TWILIO_VERIFY_SID;
+  const { status, body } = await _twilioRequest(
+    `/Services/${verifySid}/VerificationCheck`,
+    { To: `+${phone}`, Code: code }
+  );
+  if (status !== 200) {
+    console.error("[otp:twilio] check failed:", body.message || body.code);
+    return { valid: false, reason: "error" };
+  }
+  if (body.status === "approved") return { valid: true };
+  return { valid: false, reason: "wrong_code" };
+}
+
+const crypto = require("crypto");
+const OTP_TTL_MS = 5 * 60 * 1000;
+const MAX_REQUESTS_PER_WINDOW = 5;
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+
+function generateOtp() {
+  const bytes = crypto.randomBytes(4);
+  const num   = bytes.readUInt32BE(0) % 1_000_000;
+  return String(num).padStart(6, "0");
+}
+
+async function _sendViaTest(phone, purpose) {
+  const recentCount = await store.countRecentOtps(phone, RATE_WINDOW_MS);
+  if (recentCount >= MAX_REQUESTS_PER_WINDOW) {
+    throw ApiError.badRequest("Too many OTP requests. Try again in a few minutes.");
+  }
+  const code      = generateOtp();
+  const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
+  const saved     = await store.createOtp(phone, code, purpose, expiresAt);
+  if (!saved) throw ApiError.internal("Could not create verification code. Please try again.");
+  console.log(`[otp:test] To: +${phone} | Code: ${code}`);
+  return { sent: true, provider: "test", dev: { code }, expiresAt };
+}
+
+async function _checkViaTest(phone, code, purpose) {
+  return store.verifyOtp(phone, code, purpose);
+}
+
 async function requestOtp(rawPhone, purpose = "verify") {
   const phone = normalizePhone(rawPhone);
   if (!phone) throw ApiError.badRequest("Invalid phone number");
@@ -56,66 +88,41 @@ async function requestOtp(rawPhone, purpose = "verify") {
     throw ApiError.badRequest("Invalid OTP purpose");
   }
 
-  // For login purpose, verify the phone is registered
   if (purpose === "login") {
     const user = await store.findUserByPhone(phone);
     if (!user) throw ApiError.notFound("No account found with this phone number");
   }
-
-  // For signup purpose, reject if phone is already registered
   if (purpose === "signup") {
     const user = await store.findUserByPhone(phone);
     if (user) throw ApiError.conflict("An account with this phone number already exists");
   }
 
-  // Rate limit: max N requests per window
-  const recentCount = await store.countRecentOtps(phone, RATE_WINDOW_MS);
-  if (recentCount >= MAX_REQUESTS_PER_WINDOW) {
-    throw ApiError.badRequest("Too many OTP requests. Try again in a few minutes.");
+  if (USE_TWILIO_VERIFY) {
+    const result = await _sendViaTwilioVerify(phone);
+    return { ...result, phone, expiresAt: new Date(Date.now() + OTP_TTL_MS).toISOString() };
   }
 
-  const code = generateOtp();
-  const expiresAt = new Date(Date.now() + OTP_TTL_MS).toISOString();
-
-  // Do not send an SMS for a code that was never stored (it could never be verified).
-  const saved = await store.createOtp(phone, code, purpose, expiresAt);
-  if (!saved) throw ApiError.internal("Could not create verification code. Please try again.");
-
-  // Send SMS
-  const displayPhone = `+${phone}`;
-  await sendSms(displayPhone, `Your LinguaChat verification code is: ${code}. It expires in 5 minutes.`);
-
-  const result = { sent: true, phone, expiresAt, provider: getProvider() };
-
-  // In non-production, include the code in the response for testing
-  if (process.env.NODE_ENV !== "production") {
-    result.dev = { code };
-  }
-
-  return result;
+  const result = await _sendViaTest(phone, purpose);
+  if (process.env.NODE_ENV !== "production") return { ...result, phone };
+  const { dev: _removed, ...safe } = result;
+  return { ...safe, phone };
 }
 
-/**
- * Verify an OTP code.
- *
- * @param {string} rawPhone
- * @param {string} code
- * @param {string} purpose
- * @returns {{ verified: boolean, reason?: string }}
- */
 async function verifyOtp(rawPhone, code, purpose = "verify") {
   const phone = normalizePhone(rawPhone);
   if (!phone) throw ApiError.badRequest("Invalid phone number");
 
-  const result = await store.verifyOtp(phone, code, purpose);
+  const result = USE_TWILIO_VERIFY
+    ? await _checkViaTwilioVerify(phone, code)
+    : await _checkViaTest(phone, code, purpose);
 
   if (!result.valid) {
     const messages = {
-      no_code: "No pending verification code found. Request a new one.",
-      expired: "Verification code has expired. Request a new one.",
-      wrong_code: "Invalid verification code.",
+      no_code:           "No pending verification code found. Request a new one.",
+      expired:           "Verification code has expired. Request a new one.",
+      wrong_code:        "Invalid verification code.",
       too_many_attempts: "Too many failed attempts. Request a new code.",
-      error: "Verification failed. Please try again.",
+      error:             "Verification failed. Please try again.",
     };
     throw ApiError.badRequest(messages[result.reason] || "Verification failed.");
   }
