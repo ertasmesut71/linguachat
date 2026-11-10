@@ -2,8 +2,9 @@ const Stripe = require("stripe");
 const store = require("../../db/store");
 const ApiError = require("../../utils/ApiError");
 
-const SUCCESS_URL = "https://linguachat.onrender.com/payment/success?session_id={CHECKOUT_SESSION_ID}";
-const CANCEL_URL = "https://linguachat.onrender.com/payment/cancel";
+const BASE_URL    = process.env.CLIENT_URL || "https://linguachat-7pfh.onrender.com";
+const SUCCESS_URL = `${BASE_URL}/payment/success?session_id={CHECKOUT_SESSION_ID}`;
+const CANCEL_URL  = `${BASE_URL}/payment/cancel`;
 
 let stripeClient = null;
 
