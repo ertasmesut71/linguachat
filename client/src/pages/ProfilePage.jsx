@@ -23,6 +23,23 @@ export default function ProfilePage() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState(null);
 
+  // Billing: start Stripe Checkout (api client adds the Bearer token from localStorage)
+  const [premiumLoading, setPremiumLoading] = useState(false);
+  const [premiumError, setPremiumError] = useState(null);
+  const handleGoPremium = async () => {
+    setPremiumLoading(true);
+    setPremiumError(null);
+    try {
+      const res = await api.post("/billing/create-checkout-session");
+      const url = res?.data?.url;
+      if (!url) throw new Error("Ödeme sayfası açılamadı.");
+      window.location.href = url;
+    } catch (err) {
+      setPremiumError(err?.message || "Ödeme sayfası açılamadı. Lütfen tekrar deneyin.");
+      setPremiumLoading(false);
+    }
+  };
+
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -527,6 +544,33 @@ export default function ProfilePage() {
               )}
             </div>
           )}
+
+          {/* Premium (Stripe billing) */}
+          <div
+            style={{
+              marginTop: 32,
+              padding: "16px",
+              background: "var(--surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.8px", marginBottom: 12 }}>
+              Premium
+            </div>
+            {user?.subscriptionStatus === "active" ? (
+              <div style={{ fontSize: 13, color: "var(--green)" }}>Premium üyeliğiniz aktif.</div>
+            ) : (
+              <>
+                <button className="btn btn-primary" onClick={handleGoPremium} disabled={premiumLoading}>
+                  {premiumLoading ? <Spinner size="sm" /> : "Premium'a Geç"}
+                </button>
+                {premiumError && (
+                  <div style={{ marginTop: 8, fontSize: 12, color: "var(--red)" }}>{premiumError}</div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Account info */}
           <div

@@ -9,6 +9,8 @@ import ResetPasswordPage from "./pages/ResetPasswordPage";
 import QRLoginPage from "./pages/QRLoginPage";
 import ScanQRPage from "./pages/ScanQRPage";
 import ProfilePage from "./pages/ProfilePage";
+import PaymentSuccess from "./pages/PaymentSuccess";
+import PaymentCancel from "./pages/PaymentCancel";
 import AppLayout from "./components/AppLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
@@ -56,6 +58,8 @@ function AppInner() {
         <Route path="/qr-login" element={user ? <Navigate to="/" replace /> : <QRLoginPage />} />
         <Route path="/scan" element={<ProtectedRoute><ScanQRPage /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
+        <Route path="/payment/success" element={<PaymentSuccess />} />
+        <Route path="/payment/cancel" element={<PaymentCancel />} />
         <Route path="/*" element={<ProtectedRoute><AppLayout /></ProtectedRoute>} />
       </Routes>
       {toast && (
