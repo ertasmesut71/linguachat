@@ -25,6 +25,7 @@ const searchRoutes = require("./modules/search/search.routes");
 const contactsRoutes = require("./modules/contacts/contacts.routes");
 const adminRoutes = require("./modules/admin/admin.routes");
 const aiRoutes = require("./modules/ai/ai.routes");
+const billingRoutes = require("./modules/billing/billing.routes");
 const { createSocketServer } = require("./ws/socketServer");
 const { seed } = require("./db/seed");
 
@@ -48,6 +49,8 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
+// Stripe webhook needs the raw body for signature checks; must run before express.json.
+app.use("/api/billing/webhook", express.raw({ type: "application/json" }));
 app.use(express.json({ limit: "30mb" }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -93,6 +96,7 @@ app.use("/api/search", apiLimiter, searchRoutes);
 app.use("/api/contacts", apiLimiter, contactsRoutes);
 app.use("/api/admin", apiLimiter, adminRoutes);
 app.use("/api/ai", aiLimiter, aiRoutes);
+app.use("/api/billing", billingRoutes);
 
 // ─── Serve React SPA (production only) ───
 if (config.env === "production") {

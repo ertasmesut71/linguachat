@@ -62,6 +62,7 @@ model User {
   role         UserRole   @default(user)
   status       UserStatus @default(offline)
   primaryLang  String     @default("en") @map("primary_lang") @db.VarChar(10)
+  subscriptionStatus String? @default("free") @map("subscription_status") @db.VarChar(20)
   lastSeenAt   DateTime   @default(now()) @map("last_seen_at") @db.Timestamptz()
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz()
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz()
