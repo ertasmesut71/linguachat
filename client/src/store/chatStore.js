@@ -710,6 +710,14 @@ export const useChatStore = create((set, get) => ({
     } catch {}
   },
 
+  getBilingualMode: (chatId) => {
+    try { return localStorage.getItem(`bilingual_${chatId}`) === "true"; } catch { return false; }
+  },
+
+  setBilingualMode: (chatId, val) => {
+    try { localStorage.setItem(`bilingual_${chatId}`, val ? "true" : "false"); } catch {}
+  },
+
   // ═══ FIX G: CUSTOM LISTS ═══
 
   customLists: [],

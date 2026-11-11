@@ -120,7 +120,7 @@ export default function MessageBubble({ message, showSender, isGroup, onOpenDocC
     pinMessage, unpinMessage, pinnedMessages,
     editMessage, activeChatId,
     enterSelectionMode, toggleMessageSelection,
-    highlightedMessageId,
+    highlightedMessageId, getBilingualMode,
   } = useChatStore();
   const isMine = message.senderId === me?.id || message.senderId === "__self__";
   const isStarred = starredMessageIds?.has(message.id);
@@ -138,7 +138,8 @@ export default function MessageBubble({ message, showSender, isGroup, onOpenDocC
   const allTrans = message._allTranslations;
   const meta = message.metadata || {};
 
-  const [showOriginal, setShowOriginal] = useState(false);
+  const bilingualMode = getBilingualMode(message.chatId);
+  const [showOriginal, setShowOriginal] = useState(bilingualMode);
   const [showSentTrans, setShowSentTrans] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [imgError, setImgError] = useState(false);

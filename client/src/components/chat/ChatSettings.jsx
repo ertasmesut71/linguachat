@@ -26,7 +26,7 @@ const TIMER_OPTIONS = [
 
 export default function ChatSettings({ chat, onClose }) {
   const me = useAuthStore((s) => s.user);
-  const { mySettings, updateMySettings, onlineUsers, fetchChats, markChatBlocked, markChatUnblocked, clearChat, deleteLocalChat, archiveChat, favoriteChat, getChatTheme, setChatTheme } = useChatStore();
+  const { mySettings, updateMySettings, onlineUsers, fetchChats, markChatBlocked, markChatUnblocked, clearChat, deleteLocalChat, archiveChat, favoriteChat, getChatTheme, setChatTheme, getBilingualMode, setBilingualMode } = useChatStore();
   const [adminAction, setAdminAction] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   // Pack A+B state
@@ -37,6 +37,8 @@ export default function ChatSettings({ chat, onClose }) {
   const [timerLoading, setTimerLoading] = useState(false);
   // Pack F: theme
   const [currentTheme, setCurrentTheme] = useState("default");
+  // Bilingual view (per chat, localStorage)
+  const [bilingual, setBilingual] = useState(() => (chat?.id ? getBilingualMode(chat.id) : false));
 
   const settings = mySettings[chat?.id] || {};
   const currentReceiveLang = settings.receiveLang || settings.effectiveReceiveLang || me?.primaryLang || "en";
@@ -132,11 +134,13 @@ export default function ChatSettings({ chat, onClose }) {
       }).catch(() => {});
       // Pack F: load theme from localStorage
       setCurrentTheme(getChatTheme(chat.id));
+      setBilingual(getBilingualMode(chat.id));
     }
   }, [chat?.id]);
 
   const handleReceiveLangChange = (code) => updateMySettings(chat.id, { receiveLang: code });
   const handleAutoTranslateToggle = () => updateMySettings(chat.id, { autoTranslate: !autoTranslate });
+  const handleBilingualToggle = () => { const val = !bilingual; setBilingual(val); setBilingualMode(chat.id, val); };
 
   const handleMuteToggle = async () => {
     const newVal = !isMuted;
@@ -380,6 +384,14 @@ export default function ChatSettings({ chat, onClose }) {
           <div><div style={{ fontSize: 13, fontWeight: 500 }}>Auto-translate</div><div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>{autoTranslate ? "Active" : "Paused"}</div></div>
           <button onClick={handleAutoTranslateToggle} style={{ width: 44, height: 24, borderRadius: "var(--radius-full)", background: autoTranslate ? "var(--accent)" : "var(--bg-tertiary)", border: `1px solid ${autoTranslate ? "var(--accent)" : "var(--border)"}`, cursor: "pointer", position: "relative" }}>
             <div style={{ width: 18, height: 18, borderRadius: "50%", background: "white", position: "absolute", top: 2, left: autoTranslate ? 22 : 2, transition: "left 0.2s ease" }} />
+          </button>
+        </div>
+
+        {/* Bilingual view */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 0", borderBottom: "1px solid var(--border-subtle)" }}>
+          <div><div style={{ fontSize: 13, fontWeight: 500 }}>İkidilli Görünüm</div><div style={{ fontSize: 11, color: "var(--text-tertiary)", marginTop: 2 }}>Her mesajda orijinal ve çeviri birlikte</div></div>
+          <button onClick={handleBilingualToggle} style={{ width: 44, height: 24, borderRadius: "var(--radius-full)", background: bilingual ? "var(--accent)" : "var(--bg-tertiary)", border: `1px solid ${bilingual ? "var(--accent)" : "var(--border)"}`, cursor: "pointer", position: "relative" }}>
+            <div style={{ width: 18, height: 18, borderRadius: "50%", background: "white", position: "absolute", top: 2, left: bilingual ? 22 : 2, transition: "left 0.2s ease" }} />
           </button>
         </div>
 
