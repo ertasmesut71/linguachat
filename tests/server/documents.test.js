@@ -33,11 +33,12 @@ async function uploadFile(app, token, { buffer, originalName, mimeType }) {
 }
 
 describe("Document intelligence (Part 3)", () => {
-  let app, token;
+  let app, token, store;
 
   beforeEach(async () => {
-    ({ app } = buildApp());
+    ({ app, store } = buildApp());
     const u = await registerUser(app);
+    await store.updateUser(u.user.id, { subscriptionStatus: "active" });
     token = u.token;
   });
 

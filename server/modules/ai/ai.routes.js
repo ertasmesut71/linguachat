@@ -10,10 +10,10 @@ router.use(authenticate);
 
 // ─── Existing routes (preserved) ───
 
-router.get("/chats/:chatId/smart-replies", ctrl.smartReplies);
-router.get("/chats/:chatId/summary", ctrl.summarize);
+router.get("/chats/:chatId/smart-replies", requirePremium, ctrl.smartReplies);
+router.get("/chats/:chatId/summary", requirePremium, ctrl.summarize);
 
-router.post("/rewrite", validate(z.object({
+router.post("/rewrite", requirePremium, validate(z.object({
   text: z.string().min(1).max(5000),
   tone: z.enum(["formal", "casual", "professional", "enthusiastic", "concise", "polite", "friendly", "warm"]),
   lang: z.string().min(2).max(10).optional(),
@@ -26,22 +26,22 @@ router.post("/grammar", validate(z.object({
 
 // ─── Part 3: Document intelligence ───
 
-router.post("/files/:fileId/summarize", validate(z.object({
+router.post("/files/:fileId/summarize", requirePremium, validate(z.object({
   lang: z.string().min(2).max(10).optional(),
   chatId: z.string().uuid().optional(),
 })), ctrl.summarizeFile);
 
-router.post("/files/:fileId/ask", validate(z.object({
+router.post("/files/:fileId/ask", requirePremium, validate(z.object({
   question: z.string().min(1).max(5000),
   lang: z.string().min(2).max(10).optional(),
   chatId: z.string().uuid().optional(),
 })), ctrl.askFile);
 
-router.post("/files/:fileId/ocr", validate(z.object({
+router.post("/files/:fileId/ocr", requirePremium, validate(z.object({
   lang: z.string().min(2).max(10).optional(),
   chatId: z.string().uuid().optional(),
 })), ctrl.ocrFile);
 
-router.get("/chats/:chatId/tasks", ctrl.chatTasks);
+router.get("/chats/:chatId/tasks", requirePremium, ctrl.chatTasks);
 
 module.exports = router;
