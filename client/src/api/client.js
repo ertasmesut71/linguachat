@@ -118,11 +118,12 @@ async function request(endpoint, options = {}) {
   if (!response.ok) {
     const error = {
       status: response.status,
-      message: data?.message || `Request failed with status ${response.status}`,
+      message: data?.error || data?.message || `Request failed with status ${response.status}`,
       details: data?.details || null,
+      code: data?.code || null,
     };
 
-    if (response.status !== 400 && window.__linguachat_toast) {
+    if (response.status !== 400 && error.code !== "PREMIUM_REQUIRED" && window.__linguachat_toast) {
       window.__linguachat_toast(error.message, "error");
     }
 

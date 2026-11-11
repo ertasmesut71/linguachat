@@ -13,7 +13,14 @@ export default function SummaryPanel({ chatId, onClose }) {
     try {
       const data = await api.get(`/ai/chats/${chatId}/summary`);
       setSummary(data.data.summary);
-    } catch (err) { setError(err?.message || "Failed to generate summary"); }
+    } catch (err) {
+      if (err?.code === "PREMIUM_REQUIRED") {
+        setError("Bu özellik yalnızca Premium üyeler için geçerlidir.");
+        setLoading(false);
+        return;
+      }
+      setError(err?.message || "Failed to generate summary");
+    }
     setLoading(false);
   };
 

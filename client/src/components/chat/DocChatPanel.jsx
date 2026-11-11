@@ -51,6 +51,11 @@ export default function DocChatPanel({ fileId, originalName, kindHint, chatId, o
       const resp = await api.post(`/ai/files/${fileId}/summarize`, { chatId: chatId || undefined });
       setSummary(resp.data);
     } catch (err) {
+      if (err?.code === "PREMIUM_REQUIRED") {
+        setSummaryError("Bu özellik yalnızca Premium üyeler için geçerlidir.");
+        setSummaryLoading(false);
+        return;
+      }
       setSummaryError(err?.message || "Summary failed");
     }
     setSummaryLoading(false);
@@ -62,6 +67,11 @@ export default function DocChatPanel({ fileId, originalName, kindHint, chatId, o
       const resp = await api.post(`/ai/files/${fileId}/ocr`, { chatId: chatId || undefined });
       setOcr(resp.data);
     } catch (err) {
+      if (err?.code === "PREMIUM_REQUIRED") {
+        setOcrError("Bu özellik yalnızca Premium üyeler için geçerlidir.");
+        setOcrLoading(false);
+        return;
+      }
       setOcrError(err?.message || "OCR failed");
     }
     setOcrLoading(false);
@@ -83,6 +93,15 @@ export default function DocChatPanel({ fileId, originalName, kindHint, chatId, o
         return copy;
       });
     } catch (err) {
+      if (err?.code === "PREMIUM_REQUIRED") {
+        setQaHistory((h) => {
+          const copy = [...h];
+          copy[copy.length - 1] = { q, a: "Bu özellik yalnızca Premium üyeler için geçerlidir.", lang: null, pending: false, error: true };
+          return copy;
+        });
+        setAsking(false);
+        return;
+      }
       setQaHistory((h) => {
         const copy = [...h];
         copy[copy.length - 1] = { q, a: `[Error: ${err?.message || "request failed"}]`, lang: null, pending: false, error: true };

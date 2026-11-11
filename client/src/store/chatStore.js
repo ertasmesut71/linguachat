@@ -413,7 +413,8 @@ export const useChatStore = create((set, get) => ({
       } else {
         set({ smartRepliesLoading: false });
       }
-    } catch {
+    } catch (err) {
+      if (err?.code === "PREMIUM_REQUIRED") { set({ smartReplies: [], smartRepliesLoading: false }); return; }
       set({ smartReplies: [], smartRepliesLoading: false });
     }
   },

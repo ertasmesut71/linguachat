@@ -34,7 +34,13 @@ export default function AiToolbar({ text, onTextChange, disabled }) {
     try {
       const data = await api.post("/ai/rewrite", { text, tone, lang: me?.primaryLang || "en" });
       onTextChange(data.data.rewritten);
-    } catch {}
+    } catch (err) {
+      if (err?.code === "PREMIUM_REQUIRED") {
+        window.__linguachat_toast?.("Bu özellik yalnızca Premium üyeler için geçerlidir. Profil sayfasından Premium'a geçebilirsiniz.", "error");
+        setLoading(null);
+        return;
+      }
+    }
     setLoading(null);
   };
 
