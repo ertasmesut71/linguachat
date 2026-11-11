@@ -2,6 +2,7 @@ const { Router } = require("express");
 const { z } = require("zod");
 const { validate } = require("../../middleware/validate");
 const { authenticate } = require("../../middleware/authenticate");
+const { requirePremium } = require("../../middleware/requirePremium");
 const ctrl = require("./ai.controller");
 
 const router = Router();
