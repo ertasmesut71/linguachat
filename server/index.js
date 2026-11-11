@@ -83,6 +83,7 @@ app.get("/api/health", (req, res) => {
 // mediaReadLimiter is separate from uploadLimiter because reading media (image
 // previews, file downloads) happens far more often than uploads. A single chat
 // with 10 images triggers 10 GETs per viewer per load.
+app.use("/api/auth/otp", otpLimiter);
 app.use("/api/auth", authLimiter, authRoutes);
 app.use("/api/auth/pairing", authLimiter, pairingRoutes);
 app.use("/api/push", pushRoutes);
