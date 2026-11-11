@@ -88,6 +88,7 @@ app.use("/api/auth/pairing", authLimiter, pairingRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/users", apiLimiter, usersRoutes);
 app.use("/api/chats", apiLimiter, chatsRoutes);
+app.use("/api/billing", billingRoutes);
 app.use("/api", apiLimiter, messagesRoutes);
 app.use("/api/translate", aiLimiter, translationRoutes);
 app.use("/api/voice", mediaReadLimiter, voiceRoutes);
@@ -96,7 +97,6 @@ app.use("/api/search", apiLimiter, searchRoutes);
 app.use("/api/contacts", apiLimiter, contactsRoutes);
 app.use("/api/admin", apiLimiter, adminRoutes);
 app.use("/api/ai", aiLimiter, aiRoutes);
-app.use("/api/billing", billingRoutes);
 
 // ─── Serve React SPA (production only) ───
 if (config.env === "production") {
