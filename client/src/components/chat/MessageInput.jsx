@@ -6,6 +6,7 @@ import { Send, Mic, X, Reply } from "lucide-react";
 
 export default function MessageInput({ onVoiceRecord }) {
   const [text, setText] = useState("");
+  const [originalText, setOriginalText] = useState(null);
   const ref = useRef(null);
   const typingTimeout = useRef(null);
   const { sendMessage, emitTyping, emitStopTyping, activeChatId, voiceSending, smartReplies, smartRepliesLoading, fetchSmartReplies, replyTo, clearReplyTo, isChatBlocked, getDraft, setDraft, clearDraft } = useChatStore();
@@ -21,6 +22,7 @@ export default function MessageInput({ onVoiceRecord }) {
     // Restore draft for the new chat
     const draft = activeChatId ? getDraft(activeChatId) : "";
     setText(draft);
+    setOriginalText(null); // undo belongs to the previous chat's text
     if (ref.current) {
       ref.current.style.height = "auto";
       if (draft) ref.current.style.height = Math.min(ref.current.scrollHeight, 120) + "px";
@@ -39,6 +41,7 @@ export default function MessageInput({ onVoiceRecord }) {
     // Pack D: clear draft on send
     if (activeChatId) clearDraft(activeChatId);
     setText("");
+    setOriginalText(null);
     if (ref.current) ref.current.style.height = "auto";
     clearTimeout(typingTimeout.current);
     emitStopTyping();
@@ -56,6 +59,7 @@ export default function MessageInput({ onVoiceRecord }) {
     setText(val);
     // Fix B: sync draft immediately — setDraft removes from localStorage when val is ""
     if (activeChatId) setDraft(activeChatId, val);
+    setOriginalText(null);
     const ta = e.target;
     ta.style.height = "auto";
     ta.style.height = Math.min(ta.scrollHeight, 120) + "px";
@@ -100,7 +104,9 @@ export default function MessageInput({ onVoiceRecord }) {
         <AiToolbar
           text={text}
           onTextChange={(newText) => {
+            if (originalText === null) setOriginalText(text);  // ilk rewrite'ta sakla
             setText(newText);
+            setDraft(activeChatId, newText);
             if (ref.current) {
               ref.current.value = newText;
               ref.current.style.height = "auto";
@@ -109,6 +115,23 @@ export default function MessageInput({ onVoiceRecord }) {
           }}
           disabled={!text.trim()}
         />
+        {originalText !== null && (
+          <button
+            onClick={() => {
+              setText(originalText);
+              setDraft(activeChatId, originalText);
+              setOriginalText(null);
+              if (ref.current) {
+                ref.current.value = originalText;
+                ref.current.style.height = "auto";
+                ref.current.style.height = Math.min(ref.current.scrollHeight, 120) + "px";
+              }
+            }}
+            style={{ fontSize: 12, color: "#888", marginLeft: 4, background: "none", border: "none", cursor: "pointer" }}
+          >
+            ↩ Geri Al
+          </button>
+        )}
       </div>
 
       {/* Reply preview bar */}
