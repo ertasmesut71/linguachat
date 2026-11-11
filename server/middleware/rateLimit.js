@@ -62,6 +62,20 @@ const mediaReadLimiter = createLimiter({
   message: "Media request limit reached. Limit: 300/minute.",
 });
 
+// OTP brute-force: 5 attempts per 10 minutes per IP
+const otpLimiter = createLimiter({
+  windowMs: 10 * 60 * 1000,
+  max: 5,
+  message: "Too many OTP attempts. Try again in 10 minutes.",
+});
+
+// Billing: 10 per minute per IP
+const billingLimiter = createLimiter({
+  windowMs: 60 * 1000,
+  max: 10,
+  message: "Too many billing requests. Limit: 10/minute.",
+});
+
 module.exports = {
   apiLimiter,
   authLimiter,
@@ -69,4 +83,6 @@ module.exports = {
   uploadLimiter,
   voiceLimiter,
   mediaReadLimiter,
+  otpLimiter,
+  billingLimiter,
 };

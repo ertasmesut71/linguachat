@@ -11,7 +11,7 @@ const helmet = require("helmet");
 const config = require("./config");
 const store = require("./db/store");
 const { errorHandler, notFoundHandler } = require("./middleware/errorHandler");
-const { apiLimiter, authLimiter, aiLimiter, uploadLimiter, voiceLimiter, mediaReadLimiter } = require("./middleware/rateLimit");
+const { apiLimiter, authLimiter, aiLimiter, uploadLimiter, voiceLimiter, mediaReadLimiter, otpLimiter, billingLimiter } = require("./middleware/rateLimit");
 const authRoutes = require("./modules/auth/auth.routes");
 const pairingRoutes = require("./modules/auth/pairing.routes");
 const pushRoutes = require("./modules/push/push.routes");
@@ -88,8 +88,7 @@ app.use("/api/auth/pairing", authLimiter, pairingRoutes);
 app.use("/api/push", pushRoutes);
 app.use("/api/users", apiLimiter, usersRoutes);
 app.use("/api/chats", apiLimiter, chatsRoutes);
-app.use("/api/billing", billingRoutes);
-app.use("/api", apiLimiter, messagesRoutes);
+app.use("/api/billing", billingLimiter, billingRoutes);
 app.use("/api/translate", aiLimiter, translationRoutes);
 app.use("/api/voice", mediaReadLimiter, voiceRoutes);
 app.use("/api/media", mediaReadLimiter, mediaRoutes);
@@ -97,6 +96,7 @@ app.use("/api/search", apiLimiter, searchRoutes);
 app.use("/api/contacts", apiLimiter, contactsRoutes);
 app.use("/api/admin", apiLimiter, adminRoutes);
 app.use("/api/ai", aiLimiter, aiRoutes);
+app.use("/api", apiLimiter, messagesRoutes);
 
 // ─── Serve React SPA (production only) ───
 if (config.env === "production") {
