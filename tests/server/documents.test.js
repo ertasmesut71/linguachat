@@ -273,6 +273,8 @@ describe("Document intelligence (Part 3)", () => {
     test("non-member gets 403", async () => {
       const bob = await registerUser(app, "bob@t.io");
       const carol = await registerUser(app, "carol@t.io");
+      // Premium so the 403 comes from the membership check, not the premium gate.
+      await store.updateUser(carol.user.id, { subscriptionStatus: "active" });
       const createChat = await request(app).post("/api/chats/direct")
         .set("Authorization", `Bearer ${token}`)
         .send({ otherUserId: bob.user.id });
@@ -281,6 +283,31 @@ describe("Document intelligence (Part 3)", () => {
       const res = await request(app).get(`/api/ai/chats/${chatId}/tasks`)
         .set("Authorization", `Bearer ${carol.token}`);
       expect(res.status).toBe(403);
+    });
+  });
+
+  describe("Premium gate (requirePremium)", () => {
+    test("non-premium member gets 403 PREMIUM_REQUIRED on tasks", async () => {
+      // bob is a chat member but not premium, so only the premium gate can reject him.
+      const bob = await registerUser(app, "bob@t.io");
+      const createChat = await request(app).post("/api/chats/direct")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ otherUserId: bob.user.id });
+      const chatId = createChat.body.data.chat.id;
+
+      const res = await request(app).get(`/api/ai/chats/${chatId}/tasks`)
+        .set("Authorization", `Bearer ${bob.token}`);
+      expect(res.status).toBe(403);
+      expect(res.body.code).toBe("PREMIUM_REQUIRED");
+    });
+
+    test("non-premium user is not blocked on grammar (free feature)", async () => {
+      const bob = await registerUser(app, "bob@t.io");
+      const res = await request(app).post("/api/ai/grammar")
+        .set("Authorization", `Bearer ${bob.token}`)
+        .send({ text: "this are a test" });
+      expect(res.status).not.toBe(403);
+      expect(res.body.code).not.toBe("PREMIUM_REQUIRED");
     });
   });
 });
